@@ -1,0 +1,21 @@
+{
+    "$schema": "https://raw.githubusercontent.com/shibisty/gtr/main/schema/gtr.schema.json",
+    "name": "luna-cli",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Command-line tools of the Luna stack (key:generate)",
+    "license": "MIT",
+    "engines": {
+        "go": ">=1.22"
+    },
+    "dependencies": {},
+    "build": {
+        "entry": ".",
+        "output": "luna-cli",
+        "ldflags": "-s -w -X main.version={{version}}"
+    },
+    "scripts": {
+        "start": "go run . --",
+        "test": "go test ./..."
+    }
+}
