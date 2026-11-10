@@ -37,6 +37,34 @@ luna-cli key:generate --show        # put it into luna-dashboard/.env LUNA_SERVI
                                     # and luna-auth/.env LUNA_DASHBOARD_TOKEN
 ```
 
+## smoke
+
+Checks the running stack end to end, through nginx, the way its users see it:
+
+```bash
+docker compose up -d
+cd luna-cli
+go run . smoke --insecure      # the local certificate is self-signed
+```
+
+1. `http://` redirects to `https://` on both hosts; the dashboard's `/internal/` answers 404 from outside.
+2. A developer signs up in the dashboard (the HTML forms, with their CSRF token), creates an
+   application and a server key with `auth:login`, `auth:users.read` and `auth:users.write`.
+3. With that key on luna-auth: `/v1/ping` names the application (no key: 401); an end user
+   registers, signs in by username (a wrong password: 401), reads `/v1/me`, rotates the refresh
+   token (the old one is then refused); the administration API lists and deletes the user.
+4. The application is deleted. The developer account (`smoke-<random>@luna.local`) stays: the
+   dashboard cannot delete accounts yet.
+
+| Flag | Default | |
+|---|---|---|
+| `--dashboard` | `https://dashboard.luna.local` | the dashboard's public URL |
+| `--auth` | `https://auth.luna.local` | luna-auth's public URL |
+| `--insecure` | | accept any TLS certificate |
+| `--timeout` | `10s` | per request |
+
+Each passed check prints `ok`; the first failure prints `FAIL …` and exits 1.
+
 ## License
 
 MIT

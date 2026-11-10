@@ -3,6 +3,7 @@
 //	luna-cli key:generate                  set AUTH_JWT_SECRET in ./.env
 //	luna-cli key:generate --show           print a key, change nothing
 //	luna-cli key:generate --name LUNA_DASHBOARD_TOKEN --env ../luna-auth/.env
+//	luna-cli smoke --insecure              check the local stack end to end
 package main
 
 import (
@@ -23,6 +24,7 @@ type command struct {
 
 var commands = map[string]command{
 	"key:generate": {"generate a random secret and set it in a .env file", keyGenerate},
+	"smoke":        {"check the running stack end to end, through nginx", smoke},
 }
 
 func main() {
