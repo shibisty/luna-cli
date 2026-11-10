@@ -47,12 +47,14 @@ cd luna-cli
 go run . smoke --insecure      # the local certificate is self-signed
 ```
 
-1. `http://` redirects to `https://` on both hosts; the dashboard's `/internal/` answers 404 from outside.
+1. `http://` redirects to `https://` on both hosts; `/internal/` answers 404 from outside on both.
 2. A developer signs up in the dashboard (the HTML forms, with their CSRF token), creates an
-   application and a server key with `auth:login`, `auth:users.read` and `auth:users.write`.
+   application and a server key with every `auth:` scope.
 3. With that key on luna-auth: `/v1/ping` names the application (no key: 401); an end user
    registers, signs in by username (a wrong password: 401), reads `/v1/me`, rotates the refresh
-   token (the old one is then refused); the administration API lists and deletes the user.
+   token (the old one is then refused); the server sets a data value that the user reads at
+   `/v1/me/data`; the dashboard's user page shows the user and sets another value, which the API
+   then returns; the administration API lists and deletes the user.
 4. The application is deleted. The developer account (`smoke-<random>@luna.local`) stays: the
    dashboard cannot delete accounts yet.
 

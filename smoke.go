@@ -99,11 +99,14 @@ func (s *smokeRun) run() error {
 		}
 		s.ok("%s redirects to https", strings.TrimPrefix(base, "https://"))
 	}
-	if strings.HasPrefix(s.dash, "https://") {
-		if code, _, err := s.do(s.api, "GET", s.dash+"/internal/openapi.yaml", "", nil); err != nil || code != http.StatusNotFound {
-			return fmt.Errorf("dashboard /internal/ from outside: %d %v (want 404)", code, err)
+	for _, base := range []string{s.dash, s.auth} {
+		if !strings.HasPrefix(base, "https://") {
+			continue
 		}
-		s.ok("dashboard /internal/ is not reachable from outside")
+		if code, _, err := s.do(s.api, "GET", base+"/internal/openapi.yaml", "", nil); err != nil || code != http.StatusNotFound {
+			return fmt.Errorf("%s/internal/ from outside: %d %v (want 404)", base, code, err)
+		}
+		s.ok("%s/internal/ is not reachable from outside", strings.TrimPrefix(base, "https://"))
 	}
 	for _, base := range []string{s.dash, s.auth} {
 		if code, _, err := s.do(s.api, "GET", base+"/healthz", "", nil); err != nil || code != http.StatusOK {
@@ -138,7 +141,7 @@ func (s *smokeRun) run() error {
 
 	page, err = s.form("/apps/"+appID+"/keys/new", "/apps/"+appID+"/keys", url.Values{
 		"name": {"smoke"}, "kind": {"server"},
-		"scopes": {"auth:login", "auth:users.read", "auth:users.write"},
+		"scopes": {"auth:login", "auth:users.read", "auth:users.write", "auth:data.read", "auth:data.write"},
 	})
 	if err != nil {
 		return fmt.Errorf("create key: %w", err)
@@ -212,6 +215,39 @@ func (s *smokeRun) run() error {
 		return fmt.Errorf("reusing a rotated refresh token: %w", err)
 	}
 	s.ok("refresh rotates, and a reused refresh token is refused")
+
+	// The application's data about the user: the server writes, the user
+	// reads their own, the developer sees and edits it in the dashboard.
+	dataPath := "/v1/users/" + reg.User.ID + "/data"
+	if err := s.json("PUT", dataPath+"/plan", h, map[string]string{"value": "pro"}, http.StatusCreated, nil); err != nil {
+		return err
+	}
+	var mine struct {
+		Data map[string]string `json:"data"`
+	}
+	if err := s.json("GET", "/v1/me/data", bearer, nil, http.StatusOK, &mine); err != nil {
+		return err
+	}
+	if mine.Data["plan"] != "pro" {
+		return fmt.Errorf("/v1/me/data: %v", mine.Data)
+	}
+	s.ok("user data: set by the server, read by the user")
+
+	userPage := "/apps/" + appID + "/users/" + reg.User.ID
+	page, err = s.form(userPage, userPage+"/data", url.Values{"key": {"city"}, "value": {"Kyiv"}})
+	if err != nil {
+		return fmt.Errorf("dashboard: set data: %w", err)
+	}
+	if !strings.Contains(page.body, reg.User.Email) || !strings.Contains(page.body, "Kyiv") || !strings.Contains(page.body, "pro") {
+		return errors.New("dashboard: the user page does not show the user and their data")
+	}
+	var city struct {
+		Value string `json:"value"`
+	}
+	if err := s.json("GET", dataPath+"/city", h, nil, http.StatusOK, &city); err != nil || city.Value != "Kyiv" {
+		return fmt.Errorf("data set in the dashboard: %q %v", city.Value, err)
+	}
+	s.ok("dashboard shows the user and edits their data")
 
 	if err := s.json("GET", "/v1/users", h, nil, http.StatusOK, nil); err != nil {
 		return err
